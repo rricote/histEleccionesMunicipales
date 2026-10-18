@@ -5,7 +5,9 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>Elecciones municipales</title>
 <meta name="description" content="Resultados de las elecciones municipales de España (1979-2023) por sección censal, municipio, provincia, diputación y cabildo.">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&family=Public+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap"><link rel="stylesheet" href="css/style.css">
+
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&family=Public+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="css/style.css">
 
 </head>
 <body>
@@ -102,7 +104,7 @@ function winners() {
 /* ---------- gobiernos de diputaciones y cabildos ---------- */
 function bodies() {
   const L = [];
-  G.prov.forEach(p => { if (p.dip) L.push({ id: 'd' + p.id, kind: 'd', pid: p.id, n: 'Diputación de ' + p.n, short: p.n, seats: p.dip.s, es: p.dip.es }) });
+  G.prov.forEach(p => { if (p.dip) L.push({ id: 'd' + p.id, kind: 'd', pid: p.id, n: (isF(p.id) ? 'Juntas Generales de ' : 'Diputación de ') + p.n, short: p.n, seats: p.dip.s, es: p.dip.es }) });
   G.cab.forEach(c => L.push({ id: 'c' + c.id, kind: 'c', pid: c.pid, cid: c.id, n: 'Cabildo de ' + c.n, short: c.n, seats: c.s, es: c.es }));
   return L;
 }
@@ -136,19 +138,19 @@ function terr() {
 function lastSeats() {
   const MAXG = 4, L = [];
   if (!G.hasdip) { $('#disp').innerHTML = '<p class="note">En estas elecciones no hay datos de partidos judiciales ni de diputaciones.</p>'; $('#lsnote').textContent = ''; return }
-  $('#lsnote').textContent = `Los diputados provinciales se reparten por partido judicial con D'Hondt y umbral del 5 %. El último diputado de cada partido judicial es el que más se juega. Cada cuadrado es un rival y su posición indica cuántos puntos de voto le habrían faltado para quitárselo al partido que lo tiene (con el resto reducidos en proporción). Aparecen los partidos judiciales con un rival a menos de ${MAXG} puntos, de más a menos ajustados.`;
+  $('#lsnote').textContent = `Los diputados provinciales se reparten por partido judicial con D'Hondt y umbral del 5 % (en las Juntas Generales vascas, por circunscripción y con umbral del 3 %). El último diputado de cada partido judicial es el que más se juega. Cada cuadrado es un rival y su posición indica cuántos puntos de voto le habrían faltado para quitárselo al partido que lo tiene (con el resto reducidos en proporción). Aparecen los partidos judiciales con un rival a menos de ${MAXG} puntos, de más a menos ajustados.`;
   Object.entries(ALL).forEach(([pid, P]) => P.pj.forEach(pj => {
     const seats = pj[2]; if (seats < 2) return;
-    const E = ents(pj[6], pj[7]), A = analyzeE(E, pj[4], seats, 0.05); if (!A.lastW) return;
+    const E = ents(pj[6], pj[7]), A = analyzeE(E, pj[4], seats, THR(pid)); if (!A.lastW) return;
     const h = A.lastW.k, gaps = [];
-    A.L.forEach((e, j) => { if (j === h) return; const nd = needShare(A.row, j, seats, A.es[j] + 1, 0.05); if (nd !== null) gaps.push([j, (nd - A.row[j]) * 100, (nd - A.row[j]) * A.valid]) });
+    A.L.forEach((e, j) => { if (j === h) return; const nd = needShare(A.row, j, seats, A.es[j] + 1, THR(pid)); if (nd !== null) gaps.push([j, (nd - A.row[j]) * 100, (nd - A.row[j]) * A.valid]) });
     gaps.sort((x, y) => x[1] - y[1]);
     if (gaps.length && gaps[0][1] <= MAXG) L.push({ pid, pj, A, h, gaps: gaps.filter(g => g[1] <= MAXG).slice(0, 4) });
   }));
   L.sort((x, y) => x.gaps[0][1] - y.gaps[0][1]);
   const fm = x => x.toFixed(2).replace('.', ','), xx = g => (1 - Math.min(g, MAXG) / MAXG) * 100;
   const ticks = [4, 3, 2, 1, 0].map(v => `<span class="${v % 2 ? 'o' : ''}" style="left:${(1 - v / MAXG) * 100}%">${v === 0 ? 'empate' : 'a ' + v + ' pts'}</span>`).join('');
-  let h = `<div class="ax"><span>Partido judicial</span><div class="tk">${ticks}</div><span class="hh">Tiene el último diputado</span></div>`;
+  let h = `<div class="ax"><span>Partido judicial / circunscripción</span><div class="tk">${ticks}</div><span class="hh">Tiene el último diputado</span></div>`;
   L.slice(0, 60).forEach(d => {
     const g0 = d.gaps[0], pos = xx(g0[1]), al = pos > 70 ? `right:${100 - pos}%;text-align:right` : `left:${pos}%;transform:translateX(-50%)`, ln = j => d.A.L[j];
     const sq = d.gaps.slice().reverse().map(g => `<span class="sq" style="left:${xx(g[1])}%;background:${pcol(ln(g[0]).i)}" title="${esc(en(ln(g[0])))} a ${fm(g[1])} pts · unos ${nf(Math.ceil(g[2] / 10) * 10)} votos"></span>`).join('');

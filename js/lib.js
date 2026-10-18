@@ -290,3 +290,13 @@ function partyBlock(host, o) {
   document.addEventListener('mousemove', e => { if (cur) pos(e) });
   document.addEventListener('mouseout', e => { if (cur && !(e.relatedTarget && cur.contains(e.relatedTarget)) && e.target.closest && e.target.closest('svg') && (!e.relatedTarget || !e.relatedTarget.closest || e.relatedTarget.closest(SEL) !== cur)) { const t = box(); if (t) t.style.display = 'none'; cur = null } });
 })();
+
+/* Juntas Generales (Araba/Bizkaia/Gipuzkoa): terminología y umbral propios */
+const FORAL = new Set(['01', '20', '48']);
+const isF = pid => FORAL.has(pid);
+const THR = pid => isF(pid) ? 0.03 : 0.05;
+const THRT = pid => isF(pid) ? '3 %' : '5 %';
+const CAP = t => t.charAt(0).toUpperCase() + t.slice(1);
+const PJW = (pid, pl) => isF(pid) ? (pl ? 'circunscripciones' : 'circunscripción') : (pl ? 'partidos judiciales' : 'partido judicial');
+const DIPN = pid => isF(pid) ? 'Juntas Generales' : 'Diputación provincial';
+const DIPR = pid => isF(pid) ? 'junteros' : 'diputados provinciales';
