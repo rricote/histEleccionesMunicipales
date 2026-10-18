@@ -51,7 +51,8 @@ function viewMun() {
       <p class="note" id="mapn"></p>
       <svg class="pmap munmap" id="pmap" role="img" aria-label="Mapa de la provincia"></svg>
       <div class="leg2" id="mleg"></div><p class="mapnote" id="mapnote"></p></section>
-    <section class="card pd" id="pd"></section></div>`;
+    <section class="card pd" id="pd"></section></div>
+    <section class="card" id="mdisp"></section>`;
   $('#p-muns').innerHTML = `<section class="card" id="pbcard"></section>
     <div class="cols one"><section class="card"><h2>Municipios de la provincia</h2>
       <p class="note">Pulsa una fila para ver el municipio${G.sections ? ', con el resultado por secciones censales' : ''}. Ordena con las cabeceras.</p>
@@ -59,7 +60,18 @@ function viewMun() {
       <div class="tw tall"><table class="pt mt mun" id="mtab"></table></div></section></div>`;
   $('#cVot').onclick = () => { BY = 'v'; mapMun() }; $('#cCon').onclick = () => { BY = 's'; mapMun() };
   $('#mfilt').oninput = e => { FILT = e.target.value; mtable() };
-  mapMun(); detailMun(); mtable(); pblock();
+  mapMun(); detailMun(); mtable(); pblock(); mDisp();
+}
+let DSZ = 0;
+function mDisp() {
+  const L = [];
+  M.forEach(m => { const seats = m.E.reduce((a, e) => a + e.s, 0); if (seats < 3 || m.censo < DSZ || !dhOK(m.E, m.bl, seats)) return; const li = lastInfo(m.E, m.bl, seats, MUNTHR); if (!li || !li.gaps.length) return; L.push({ m, seats, ...li }) });
+  L.sort((a, b) => a.gaps[0][1] - b.gaps[0][1]);
+  const top = L.slice(0, 40).map(d => ({ ...d, nm: `<a href="${hMun(d.m.id)}"><b>${esc(d.m.n)}</b></a>` }));
+  $('#mdisp').innerHTML = `<div class="rowhead"><div><h2>Los concejales más disputados</h2><p class="note">Municipios de la provincia cuyo último concejal está más en el aire. Cada cuadrado es un rival y su posición marca cuántos puntos de voto le habrían faltado para quitarle el último concejal a quien lo tiene (con el resto reducidos en proporción). Se ordenan de menor a mayor distancia del rival más cercano. Solo municipios en los que el reparto se reconstruye con D'Hondt (5 %) y con 3 o más concejales; se muestran los 40 más ajustados de ${L.length}.</p></div>
+  <label class="fld sel" style="margin:0"><span class="lbl">Tamaño</span><select id="dsz">${[[0, 'Todos los municipios'], [1000, 'Más de 1.000 electores'], [5000, 'Más de 5.000 electores'], [20000, 'Más de 20.000 electores']].map(([v, t]) => `<option value="${v}"${v === DSZ ? ' selected' : ''}>${t}</option>`).join('')}</select></label></div>
+  <div class="ls">${top.length ? lastRows(top, { col: 'Municipio', unit: 'concejal', abbr: 'conc.' }) : '<p class="note">Ningún municipio cumple las condiciones.</p>'}</div>`;
+  $('#dsz').onchange = e => { DSZ = +e.target.value; mDisp() };
 }
 function mapMun() {
   const svg = $('#pmap'), MS = MAPM.ms, byId = {}; M.forEach(m => byId[m.c3] = m);

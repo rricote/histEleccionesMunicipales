@@ -300,3 +300,44 @@ const CAP = t => t.charAt(0).toUpperCase() + t.slice(1);
 const PJW = (pid, pl) => isF(pid) ? (pl ? 'circunscripciones' : 'circunscripción') : (pl ? 'partidos judiciales' : 'partido judicial');
 const DIPN = pid => isF(pid) ? 'Juntas Generales' : 'Diputación provincial';
 const DIPR = pid => isF(pid) ? 'junteros' : 'diputados provinciales';
+
+/* ---- reparto D'Hondt y «último escaño» de un cuerpo (concejales de un municipio) ---- */
+const MUNTHR = 0.05;
+/* ¿el reparto real coincide con D'Hondt (5 %) sobre las candidaturas agrupadas? (no en municipios de lista abierta ni con listas de una familia agrupadas) */
+function dhOK(E, bl, seats) {
+  if (!seats) return false;
+  const A = analyzeE(E, bl, seats, MUNTHR);
+  return A.L.every((e, j) => A.es[j] === e.s) && E.filter(e => e.v <= 0 && e.s > 0).length === 0;
+}
+function lastInfo(E, bl, seats, thr) {
+  if (seats < 2) return null;
+  const A = analyzeE(E, bl, seats, thr); if (!A.lastW) return null;
+  const h = A.lastW.k, gaps = [];
+  A.L.forEach((e, j) => { if (j === h) return; const nd = needShare(A.row, j, seats, A.es[j] + 1, thr); if (nd !== null) gaps.push([j, (nd - A.row[j]) * 100, (nd - A.row[j]) * A.valid]) });
+  gaps.sort((a, b) => a[1] - b[1]);
+  return { A, h, gaps };
+}
+/* filas del gráfico «último escaño»: items [{nm (html), seats, A, h, gaps}] */
+function lastRows(items, o) {
+  const MAXG = 4, fm = x => x.toFixed(2).replace('.', ','), xx = g => (1 - Math.min(g, MAXG) / MAXG) * 100;
+  const ticks = [4, 3, 2, 1, 0].map(v => `<span class="${v % 2 ? 'o' : ''}" style="left:${(1 - v / MAXG) * 100}%">${v === 0 ? 'empate' : 'a ' + v + ' pts'}</span>`).join('');
+  let s = `<div class="ax"><span>${o.col}</span><div class="tk">${ticks}</div><span class="hh">Tiene el último ${o.unit}</span></div>`;
+  items.forEach(d => {
+    const near = d.gaps.filter(g => g[1] <= MAXG).slice(0, 4), ln = j => d.A.L[j], nm = `<span class="nm">${d.nm}<small>${d.seats} ${o.abbr}</small></span>`;
+    const hd = `<span class="hd" style="color:${pcol(ln(d.h).i)}">${esc(en(ln(d.h)).slice(0, 22))}</span>`;
+    if (!near.length) { s += `<div class="row static">${nm}<span class="tr"><span class="lb" style="left:0;color:var(--muted)">sin rival a menos de ${MAXG} pts${d.gaps.length ? ' (' + esc(en(ln(d.gaps[0][0]))) + ' a ' + fm(d.gaps[0][1]) + ')' : ''}</span></span>${hd}</div>`; return }
+    const g0 = near[0], pos = xx(g0[1]), al = pos > 70 ? `right:${100 - pos}%;text-align:right` : `left:${pos}%;transform:translateX(-50%)`;
+    s += `<div class="row static">${nm}<span class="tr">${[1, 2, 3].map(v => `<span class="g" style="left:${xx(v)}%"></span>`).join('')}${near.slice().reverse().map(g => `<span class="sq" style="left:${xx(g[1])}%;background:${pcol(ln(g[0]).i)}" title="${esc(en(ln(g[0])))} a ${fm(g[1])} pts"></span>`).join('')}<span class="lb" style="color:${pcol(ln(g0[0]).i)};${al}">${esc(en(ln(g0[0])).toUpperCase().slice(0, 22))} a ${fm(g0[1])} pts · ${nf(Math.max(1, Math.ceil(g0[2])))} votos</span></span>${hd}</div>`;
+  });
+  return s;
+}
+/* tarjeta «Cómo se reparten los concejales» */
+function dhcCard(name, E, bl, seats, extra) {
+  const A = analyzeE(E, bl, seats, MUNTHR), valid = A.valid, qmax = A.q[0] ? A.q[0].q : 1, qshow = seats > 12 ? A.q.filter(q => q.n > seats - 10) : A.q;
+  return `<h2>Cómo se reparten los concejales</h2>
+  <p class="note">Método D'Hondt en <b>${esc(name)}</b> (${seats} ${seats === 1 ? 'concejal' : 'concejales'}): cada candidatura por encima del 5 % de los votos válidos divide su voto entre 1, 2, 3…; los ${seats} cocientes más altos se llevan un concejal. Las barras sólidas ganan escaño; las punteadas son las primeras que se quedan fuera.${seats > 12 ? ' Aquí se muestran solo los últimos diez concejales repartidos y los que se quedan a las puertas.' : ''}</p>
+  ${seatBar(seatList(E), seats)}
+  <div class="qs">${qshow.map(q => `<div class="qr ${q.won ? 'won' : 'out'}"><span class="qn">${q.n}</span><span class="qp">${wnE(A.L[q.k])} <small>÷${q.d}</small></span><span class="qb"><i style="width:${q.q / qmax * 100}%;background:${pcol(A.L[q.k].i)}"></i></span><span class="qv">${fmt(q.q)}<small>${nf(Math.round(q.q * valid))}</small></span></div>`).join('')}</div>
+  <p class="note" style="margin:10px 0 0">${nf(valid)} votos válidos${extra || ''}.</p>`;
+}
+const NODH = 'En este municipio el reparto no se puede reconstruir con D\'Hondt a partir de las candidaturas agrupadas: es habitual en los municipios de 250 habitantes o menos (lista abierta o concejo abierto) o cuando varias listas de una misma familia se agrupan aquí.';

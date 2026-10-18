@@ -28,6 +28,8 @@
     </section>
     <section class="card pd" id="pd"></section>
   </div>
+  <section class="card" id="mdh"></section>
+  <section class="card" id="mlast"></section>
   </div>
   <div class="panel" id="p-secs" role="tabpanel" aria-labelledby="tab-secs" hidden>
   <section class="card" id="pbcard"></section>
@@ -128,6 +130,19 @@ function hl(k) {
   if (!k) return; const p = document.querySelector(`#pmap path[data-k="${k}"]`); if (p) { p.classList.add('hl'); p.parentNode.appendChild(p) }
   const r = document.querySelector(`#stab tr[data-k="${k}"]`); if (r) r.classList.add('hl');
 }
+function seatsInfo() {
+  const m = MU, seats = m.E.reduce((a, e) => a + e.s, 0);
+  if (!seats) { $('#mdh').hidden = $('#mlast').hidden = true; return }
+  $('#mdh').hidden = $('#mlast').hidden = false;
+  if (!dhOK(m.E, m.bl, seats)) { $('#mdh').innerHTML = `<h2>Cómo se reparten los concejales</h2><p class="note">${esc(NODH)}</p>`; $('#mlast').hidden = true; return }
+  $('#mdh').innerHTML = dhcCard(m.n, m.E, m.bl, seats, ` · ${nf(m.censo)} electores`);
+  const li = lastInfo(m.E, m.bl, seats, MUNTHR);
+  if (!li) { $('#mlast').innerHTML = `<h2>El último concejal</h2><p class="note">Con un solo concejal no hay «último» que repartir.</p>`; return }
+  const A = li.A, h = A.L[li.h], g0 = li.gaps[0];
+  $('#mlast').innerHTML = `<h2>El último concejal</h2>
+  <p class="note">El último concejal (el nº ${seats}) es para <b>${esc(en(h))}</b>${g0 ? `; su rival más cercano, <b>${esc(en(A.L[g0[0]]))}</b>, necesitaría ${nf(Math.max(1, Math.ceil(g0[2])))} votos más (${g0[1].toFixed(2).replace('.', ',')} puntos, con el resto reducido en proporción) para quitárselo.` : '.'} El gráfico muestra los rivales a menos de 4 puntos.</p>
+  <div class="ls">${lastRows([{ nm: `<b>${esc(MU.n)}</b>`, seats, ...li }], { col: 'Municipio', unit: 'concejal', abbr: 'conc.' })}</div>`;
+}
 function detail() {
   const m = MU, pa = shares(P.v, P.bl), ma = shares(m.v, m.bl), vt = m.valid + m.nu;
   const E = m.E.filter(e => e.v > 0).sort((a, b) => b.v - a.v), ns = m.E.reduce((a, e) => a + e.s, 0);
@@ -174,12 +189,12 @@ function render() {
   $('#sw').querySelectorAll('button').forEach(b => b.onclick = () => { ELV = b.dataset.v; render() });
   if (cab) {
     $('#tabs').hidden = true; $('#p-secs').hidden = true; $('#p-mun').hidden = false; $('#lvl').style.display = 'none'; $('#colrow').style.display = 'none';
-    mapCab(); detailCab();
+    $('#mdh').hidden = $('#mlast').hidden = true; mapCab(); detailCab();
   } else {
     $('#lvl').style.display = ''; $('#colrow').style.display = ''; $('#pmap').classList.remove('nob');
     const hasS = G.sections && S.length;
     $('#tabs').hidden = !hasS; if (!hasS) { VIEW = 'mun'; $('#lvl').style.display = 'none'; showTab('mun') }
-    map(); detail(); if (hasS) { stable(); pblock() }
+    map(); detail(); seatsInfo(); if (hasS) { stable(); pblock() }
   }
 }
 (async () => {
