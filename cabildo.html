@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="description" content="Resultados de las elecciones a los cabildos insulares de Canarias: consejeros, gobierno, reparto D'Hondt y voto por municipio.">
+<title>Cabildo insular</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&family=Public+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div class="wrap">
+  <div class="sitetitle"><a href="index.html">Elecciones municipales</a></div>
+  <div class="topbar"><nav class="crumbs" id="crumbs" aria-label="Migas de pan"></nav></div>
+  <div id="bar"></div>
+  <div class="switch" id="sw" role="group" aria-label="Cabildos"></div>
+  <nav class="tabs" role="tablist" aria-label="Secciones" id="tabs"><button type="button" role="tab" id="tab-prov" aria-controls="p-prov" aria-selected="true">Cabildo</button><button type="button" role="tab" id="tab-muns" aria-controls="p-muns" aria-selected="false" tabindex="-1">Análisis detallado de los municipios</button></nav>
+  <div class="panel" id="p-prov" role="tabpanel" aria-labelledby="tab-prov">
+    <section class="card pd" id="pd"></section>
+    <section class="card mapcol"><h2>Mapa por municipios de la isla</h2>
+      <p class="note" id="mapn"></p>
+      <svg class="pmap munmap" id="pmap" role="img" aria-label="Mapa de la isla"></svg>
+      <div class="leg2" id="mleg"></div><p class="mapnote" id="mapnote"></p><div id="upanel" class="upanel"></div></section>
+    <section class="card" id="dhc"></section>
+    <section class="card"><h2>El último consejero</h2><p class="note" id="lsn"></p><div class="ls" id="ls"></div></section>
+  </div>
+  <div class="panel" id="p-muns" role="tabpanel" aria-labelledby="tab-muns" hidden>
+    <section class="card" id="pbcard"></section>
+    <div class="cols one"><section class="card"><h2>Municipios de la isla</h2><p class="note">Voto de cada municipio en las elecciones al cabildo. Pulsa una fila para ver el municipio.</p><div class="tw tall"><table class="pt mt mun" id="mtab"></table></div></section></div>
+  </div>
+  <div id="empty" class="card" hidden></div>
+  <div class="notes" id="notes"></div>
+</div>
+<div class="tt" id="tt"></div>
+<script src="js/lib.js"></script>
+<script>
+const IID = (() => { let i = Q.get('i') || '38-4'; return /^3[58]-\d$/.test(i) ? i : '38-4' })();
+const PID = IID.slice(0, 2);
+let P, PD, C, MUNJ, M = [], SORT = { k: 'censo', d: -1 }, PBS;
+const THR = 0.05;
+function head() {
+  const prov = G.prov[G.pi[PID]];
+  crumbs([{ t: 'General', h: href('index.html') }, { l: 'Provincia', t: prov.n, h: hProv(PID) }, { l: 'Cabildo', t: 'Cabildo de ' + ISLN[IID] }]);
+  $('#sw').innerHTML = Object.keys(ISLN).map(i => `<a href="${hCab(i)}" class="${i === IID ? 'on' : ''}">${ISLN[i]}</a>`).join('') + `<a href="${hProv(PID)}">← Provincia de ${esc(prov.n)}</a>`;
+}
+function main() {
+  const E = ents(C[6], C[7]), seats = C[2], A = analyzeE(E, C[4], seats, THR), valid = A.valid, g = govOf('c' + IID), SL = seatList(E);
+  const vt = valid + C[5], w = win(E, C[4], 'v');
+  $('#pd').innerHTML = `<h3>Cabildo de ${esc(ISLN[IID])}</h3><div class="meta">${seats} consejeros insulares · ${M.length} municipios · ${esc(G.date)}</div>
+  <div class="kpis k4"><div><b>${fmt(vt / C[3])}</b><span>participación (${nf(vt)} votantes de ${nf(C[3])} electores)</span></div>
+  <div><b>${w ? esc(en(w.e)) : '–'}</b><span>más votado, con ${w ? fmt(w.sh) : '–'}</span></div>
+  <div><b>${SL.length ? esc(SL[0].n) : '–'}</b><span>con más consejeros (${SL.length ? SL[0].s : '–'} de ${seats}; mayoría absoluta: ${Math.floor(seats / 2) + 1})</span></div>
+  <div><b>${fmt(C[4] / valid)}</b><span>voto en blanco (${nf(C[4])}) · ${nf(C[5])} nulos</span></div></div>
+  <p class="lbl" style="margin:6px 0 2px">Gobierno del cabildo</p>${g ? govHTML(g) : '<p class="note">Sin datos de gobierno.</p>'}
+  <p class="lbl" style="margin:10px 0 2px">Composición</p>${seatBar(SL, seats)}
+  <div class="tw"><table class="pt mt prt vt"><thead><tr><th>Candidatura</th><th>Votos</th><th>% voto</th><th>Consejeros</th></tr></thead><tbody>${E.filter(e => e.v > 0).sort((a, b) => b.s - a.s || b.v - a.v).slice(0, 14).map(e => `<tr><td>${wnE(e)}</td><td class="num">${nf(e.v)}</td><td class="num"><b>${fmt(e.v / valid)}</b></td><td class="num s2">${e.s || '–'}</td></tr>`).join('')}</tbody></table></div>
+  <p class="note" style="margin:10px 0 0">Los consejeros se reparten por D'Hondt en toda la isla con umbral del 5 % de los votos válidos. El gobierno no se deduce de las urnas cuando aparece como «estimado».</p>`;
+  const qmax = A.q[0].q, qshow = seats > 12 ? A.q.filter(q => q.n > seats - 10) : A.q;
+  $('#dhc').innerHTML = `<h2>Cómo se reparten los consejeros</h2><p class="note">Método D'Hondt: cada candidatura por encima del 5 % de los votos válidos divide su voto entre 1, 2, 3…; los ${seats} cocientes más altos se llevan un consejero. Las barras sólidas ganan escaño; las punteadas son las primeras que se quedan fuera.${seats > 12 ? ' Aquí se muestran solo los últimos diez consejeros repartidos y los que se quedan a las puertas.' : ''}</p>
+  <div class="qs">${qshow.map(q => `<div class="qr ${q.won ? 'won' : 'out'}"><span class="qn">${q.n}</span><span class="qp">${wnE(A.L[q.k])} <small>÷${q.d}</small></span><span class="qb"><i style="width:${q.q / qmax * 100}%;background:${pcol(A.L[q.k].i)}"></i></span><span class="qv">${fmt(q.q)}<small>${nf(Math.round(q.q * valid))}</small></span></div>`).join('')}</div>`;
+  const MAXG = 4, fm = x => x.toFixed(2).replace('.', ','), xx = x => (1 - Math.min(x, MAXG) / MAXG) * 100;
+  const h = A.lastW.k, gaps = []; A.L.forEach((e, j) => { if (j === h) return; const nd = needShare(A.row, j, seats, A.es[j] + 1, THR); if (nd !== null) gaps.push([j, (nd - A.row[j]) * 100, (nd - A.row[j]) * valid]) }); gaps.sort((a, b) => a[1] - b[1]);
+  const near = gaps.filter(x => x[1] <= MAXG).slice(0, 4), ln = j => A.L[j];
+  $('#lsn').textContent = `${en(ln(h))} se llevó el último de los ${seats} consejeros. Cada cuadrado es un rival y su posición marca cuántos puntos de voto le habrían faltado para quitárselo (con el resto reducidos en proporción). Se muestran los que estaban a menos de ${MAXG} puntos.`;
+  const ticks = [4, 3, 2, 1, 0].map(v => `<span class="${v % 2 ? 'o' : ''}" style="left:${(1 - v / MAXG) * 100}%">${v === 0 ? 'empate' : 'a ' + v + ' pts'}</span>`).join('');
+  let s = `<div class="ax"><span>Isla</span><div class="tk">${ticks}</div><span class="hh">Tiene el último consejero</span></div>`;
+  if (!near.length) s += `<p class="note" style="margin:12px 0 0">Ningún rival estaba a menos de ${MAXG} puntos${gaps.length ? `; el más cercano era ${esc(en(ln(gaps[0][0])))}, a ${fm(gaps[0][1])} puntos (unos ${nf(Math.ceil(gaps[0][2] / 100) * 100)} votos)` : ''}.</p>`;
+  else { const g0 = near[0], pos = xx(g0[1]), al = pos > 70 ? `right:${100 - pos}%;text-align:right` : `left:${pos}%;transform:translateX(-50%)`;
+    s += `<div class="row static"><span class="nm"><b>${esc(ISLN[IID])}</b><small>${seats} consejeros</small></span><span class="tr">${[1, 2, 3].map(v => `<span class="g" style="left:${xx(v)}%"></span>`).join('')}${near.slice().reverse().map(x => `<span class="sq" style="left:${xx(x[1])}%;background:${pcol(ln(x[0]).i)}" title="${esc(en(ln(x[0])))} a ${fm(x[1])} pts"></span>`).join('')}<span class="lb" style="color:${pcol(ln(g0[0]).i)};${al}">${esc(en(ln(g0[0])).toUpperCase().slice(0, 22))} a ${fm(g0[1])} pts</span></span><span class="hd" style="color:${pcol(ln(h).i)}">${esc(en(ln(h)).slice(0, 22))}</span></div>`;
+    s += `<p class="note" style="margin:12px 0 0">${near.map(x => `${esc(en(ln(x[0])))}: ${fm(x[1])} pts · unos ${nf(Math.ceil(x[2] / 10) * 10)} votos`).join(' · ')}</p>` }
+  $('#ls').innerHTML = s;
+}
+function map() {
+  const svg = $('#pmap'), ids = new Set(M.map(m => m.c3)), byId = {}; M.forEach(m => byId[m.c3] = m);
+  const shapes = MUNJ.ms.filter(x => ids.has(x[0])); svg.innerHTML = '<g id="gm">' + shapes.map(([c3, name, d]) => { const m = byId[c3], w = m && m.cw; if (!w) return `<path class="nd" d="${d}"><title>${esc(name)}</title></path>`;
+    return `<path d="${d}" style="${shade(w.w, w.m, 0.3)}" data-m="${m.id}" tabindex="0" role="link"><title>${esc(name)} · ${esc(en(w.e))} ${fmt(w.sh)}</title></path>` }).join('') + '</g>';
+  const bb = $('#gm').getBBox(), pad = Math.max(bb.width, bb.height) * 0.03; svg.setAttribute('viewBox', `${bb.x - pad} ${bb.y - pad} ${bb.width + 2 * pad} ${bb.height + 2 * pad}`);
+  hoverFront(svg);
+  $('#mapn').textContent = 'Color: candidatura más votada en el municipio en las elecciones al cabildo; cuanto más pálido, menor la ventaja. Pulsa un municipio para fijarlo y abrir su vista (con el botón para ver también el cabildo).';
+  const used = new Set(M.filter(m => m.cw).map(m => m.cw.w)); $('#mleg').innerHTML = [...used].map(i => `<span><i style="background:${pcol(i)}"></i>${esc(pname(i))}</span>`).join('');
+  attachPanel(svg, 'path[data-m]', 'm', id => { const m = M.find(x => x.id === id); if (!m || !m.cab) return null;
+    return { title: m.n, meta: `${nf(m.censo)} electores · voto al cabildo`, E: m.cab.E, bl: m.cab.bl, nu: m.cab.nu, censo: m.censo, action: { label: 'Ver el municipio →', run: () => nav(hMun(id, 'cab')) } } }, 'Pasa el ratón por un municipio para ver su voto al cabildo. Pulsa para fijarlo.');
+}
+function pblock() {
+  const ps = vec(ents(C[6], C[7])).map((x, i) => i).filter(i => M.some(m => m.cv[i] > 0)).sort((a, b) => IV[b] - IV[a]).slice(0, 14);
+  partyBlock($('#pbcard'), { state: PBS = PBS || { party: ps[0], ord: 'pct_desc' }, ps, units: M.filter(m => m.cab).map(m => ({ key: m.id, name: m.n, censo: m.censo, part: m.cpart, v: m.cv, bl: m.cab.bl, nu: m.cab.nu })), parent: { v: IV, bl: C[4] }, parentName: 'de la isla',
+    unitName: 'Municipio', unitsPl: 'municipios', note: 'El número junto al nombre es su cifra de consejeros en la isla. Elige un partido y cómo ordenar los municipios: la tabla muestra los diez primeros.', chipSub: j => nf(CS[j]) + ' cons.', onRow: id => nav(hMun(id, 'cab')) });
+}
+let IV, CS;
+function mtable() {
+  const ps = IV.map((x, i) => i).filter(i => IV[i] > 0).sort((a, b) => IV[b] - IV[a]).slice(0, 10);
+  const rows = M.filter(m => m.cab).map(m => { const valid = m.cab.E.reduce((a, e) => a + e.v, 0) + m.cab.bl, o = { m, censo: m.censo, part: m.cpart, ganador: m.cw ? en(m.cw.e) : '', sh: m.cw ? m.cw.sh : 0, name: m.n, valid, nu: m.cab.nu }; ps.forEach(i => o['p' + i] = valid ? m.cv[i] / valid : 0); return o });
+  const k = SORT.k; rows.sort((a, b) => (typeof a[k] === 'string' ? a[k].localeCompare(b[k], 'es') : a[k] - b[k]) * SORT.d);
+  const th = (key, lab, cls = '') => `<th data-s="${key}" ${SORT.k === key ? `aria-sort="${SORT.d > 0 ? 'ascending' : 'descending'}"` : ''} class="${cls}">${lab}</th>`;
+  $('#mtab').innerHTML = `<thead><tr>${th('name', 'Municipio', 'stk')}${th('censo', 'Electores')}${th('part', 'Particip.')}${th('ganador', 'Más votado')}${th('sh', '% ganador')}${ps.map(i => th('p' + i, `<span class="wn">${swatch(i)}${esc(pname(i))}</span>`)).join('')}</tr></thead><tbody>${rows.map(r => `<tr class="rw" data-m="${r.m.id}"><td class="stk">${esc(r.m.n)}</td><td class="num">${nf(r.censo)}</td><td class="num">${fmt(r.part)}</td><td>${r.m.cw ? wnE(r.m.cw.e) : '–'}</td><td class="num">${fmt(r.sh)}</td>${ps.map(i => `<td class="num pc">${fmt(r['p' + i])}<small>${nf(r.m.cv[i])}</small></td>`).join('')}</tr>`).join('')}</tbody>`;
+  $('#mtab').querySelectorAll('th[data-s]').forEach(t => t.onclick = () => { const kk = t.dataset.s; SORT = { k: kk, d: SORT.k === kk ? -SORT.d : (kk === 'name' || kk === 'ganador' ? 1 : -1) }; mtable() });
+  $('#mtab').querySelectorAll('tr.rw').forEach(t => t.onclick = () => nav(hMun(t.dataset.m, 'cab')));
+}
+(async () => {
+  try {
+    await loadG(); P = G.prov[G.pi[PID]];
+    await mountBar(PID); mountTabs(); head();
+    if (!G.hascab) { $('#tabs').hidden = true; $('#p-prov').hidden = true; $('#empty').hidden = false; $('#empty').innerHTML = `<h2>Cabildo de ${esc(ISLN[IID])}</h2><p class="empty">No hay datos de las elecciones a los cabildos insulares para ${esc(G.date)} en los ficheros del Ministerio del Interior. Elige otra elección en el selector superior.</p>`; $('#notes').innerHTML = notesHTML(); return }
+    [PD, MUNJ] = await Promise.all([loadProv(PID), loadMunMap(PID)]);
+    C = PD.cab.find(c => c[0] === IID); if (!C) throw new Error('Cabildo sin datos');
+    M = PD.m.map(m => { const o = mkMun(m); o.id = PID + o.c3; if (o.cab) { o.cv = o.cab.v; const valid = o.cab.E.reduce((a, e) => a + e.v, 0) + o.cab.bl; o.cw = win(o.cab.E, o.cab.bl, 'v'); o.cpart = o.censo ? (valid + o.cab.nu) / o.censo : 0 } else o.cv = new Array(NP).fill(0); return o }).filter(o => o.isl === IID);
+    IV = vec(ents(C[6], C[7])); CS = svec(ents(C[6], C[7]));
+    document.title = 'Cabildo de ' + ISLN[IID] + ' · ' + G.year; setPill();
+    main(); map(); pblock(); mtable();
+    $('#notes').innerHTML = notesHTML();
+  } catch (e) { console.error(e); $('#notes').textContent = 'No se pudieron cargar los datos: ' + e }
+})();
+</script>
+</body>
+</html>
