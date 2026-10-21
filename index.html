@@ -41,11 +41,11 @@
   </section>
 
   <section class="card" id="terr">
-    <h2>Distribución territorial de representantes</h2>
+    <h2>Distribución territorial de representantes provinciales o isleños</h2>
     <p class="note" id="tnote"></p>
-    <svg class="natmap" id="tmap" role="img" aria-label="Mapa de gobiernos de diputaciones y cabildos"></svg>
+    <svg class="natmap" id="tmap" role="img" aria-label="Mapa de gobiernos de diputaciones, juntas generales y cabildos"></svg>
     <div class="leg" id="tleg"></div>
-    <p class="tnote">Las rayas indican gobiernos de coalición: solo cuentan los partidos que están en el gobierno, no los que dan apoyo externo. Las provincias en gris no tienen diputación provincial.</p>
+    <p class="tnote">Las rayas indican gobiernos de coalición: solo cuentan los partidos que están en el gobierno, no los que dan apoyo externo. Las provincias en gris no tienen diputación provincial ni juntas generales.</p>
     <div class="cards" id="tcards"></div>
   </section>
 
@@ -111,8 +111,8 @@ function bodies() {
 function bodyList(b) { return b.es.map((s, i) => ({ i, s })).filter(x => x.s > 0).sort((a, c) => c.s - a.s) }
 function terr() {
   const B = bodies(), svg = $('#tmap');
-  if (!B.length || !Object.keys(GOV).length) { $('#terr').querySelector('.tnote').hidden = true; $('#tnote').textContent = 'En estas elecciones no hay datos de diputaciones ni cabildos: las diputaciones se eligen por partido judicial desde 1987 y los cabildos canarios tienen datos desde 1987.'; svg.style.display = 'none'; return }
-  $('#tnote').textContent = 'Cada diputación provincial y cada cabildo insular se colorea con el partido (o partidos, en rayas) que forman su gobierno. Debajo, el reparto de diputados y consejeros: la línea marca la mayoría absoluta.';
+  if (!B.length || !Object.keys(GOV).length) { $('#terr').querySelector('.tnote').hidden = true; $('#tnote').textContent = 'En estas elecciones no hay datos de diputaciones ni cabildos: las diputaciones y las juntas generales se eligen por partido judicial o circunscripción desde 1987 y los cabildos canarios tienen datos desde 1987.'; svg.style.display = 'none'; return }
+  $('#tnote').textContent = 'Cada diputación provincial, cada junta general vasca y cada cabildo insular se colorea con el partido (o partidos, en rayas) que forman su gobierno. Debajo, el reparto de diputados, junteros y consejeros: la línea marca la mayoría absoluta.';
   const bm = {}; B.forEach(b => bm[b.id] = b); svg.setAttribute('viewBox', `0 0 ${MAP.w} ${MAP.h}`);
   let h = '', used = new Map();
   const tip = b => { const g = govOf(b.id); return `${b.n} · ${b.seats} ${b.kind === 'd' ? 'diputados' : 'consejeros'}${g ? ' · gobierno: ' + g.parts.map(p => p.n).join(' + ') : ''} · ${bodyList(b).map(x => pname(x.i) + ' ' + x.s).join(', ')}` };
