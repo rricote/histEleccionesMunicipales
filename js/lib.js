@@ -63,8 +63,8 @@ const swatch = i => `<span class="sw" style="background:${pcol(i)}"></span>`;
 const pname = i => G.parties[i].n;
 
 /* ---- entradas de resultados (partidos nacionales + listas locales con nombre) ---- */
-function ents(r, l) { const o = []; for (const x of r) o.push({ i: x[0], v: x[1], s: x[2], n: null }); for (const x of l) o.push({ i: LI, v: x[1], s: x[2], n: x[0] }); return o }
-const en = e => e.n || pname(e.i);
+function ents(r, l) { const o = []; for (const x of r) o.push({ i: x[0], v: x[1], s: x[2], n: null, o: x[3] != null && G.lab ? G.lab[x[3]] : null }); for (const x of l) o.push({ i: LI, v: x[1], s: x[2], n: x[0] }); return o }
+const en = e => e.n || (e.o ? `${e.o} (${pname(e.i)})` : pname(e.i));
 function vec(E) { const g = new Array(NP).fill(0); for (const e of E) g[e.i] += e.v; return g }
 function svec(E) { const g = new Array(NP).fill(0); for (const e of E) g[e.i] += e.s; return g }
 /* ganador por votos ('v') o por concejales/representantes ('s'); cada lista local cuenta por separado */
@@ -164,7 +164,23 @@ async function mountBar(curProv, curMun) {
   const EL = await jget('datos/elecciones.json');
   $('#elecSel').innerHTML = EL.map(x => `<option value="${x.id}"${x.id === ELEC ? ' selected' : ''}>${esc(x.label)}</option>`).join('');
   const here = location.pathname.split('/').pop() || 'index.html';
-  $('#elecSel').onchange = e => nav(e.target.value === EL[0].id ? 'index.html' : 'index.html?e=' + e.target.value);
+  $('#elecSel').onchange = async e => {
+    const ne = e.target.value, pg = location.pathname.split('/').pop() || 'index.html', P = new URLSearchParams(location.search);
+    P.delete('e'); if (ne !== EL[0].id) P.set('e', ne);
+    const go = (page, q) => { const u = new URLSearchParams(q || {}); if (ne !== EL[0].id) u.set('e', ne); const t = u.toString(); nav(page + (t ? '?' + t : '')) };
+    try {
+      if (pg === 'municipio.html' && P.get('m')) {
+        const ml = await jget('datos/' + ne + '/municipios.json'), m = P.get('m');
+        if (!ml.some(x => x[0] === m)) { P.delete('m'); P.delete('v'); const pid = m.slice(0, 2); return go(AUTONOMAS[pid] ? 'index.html' : 'provincia.html', AUTONOMAS[pid] ? {} : { p: pid }) }
+        if (P.get('v') === 'cab') { const g = await jget('datos/' + ne + '/general.json'); if (!(g.cab && g.cab.length)) P.delete('v') }
+      } else if (pg === 'cabildo.html') {
+        const g = await jget('datos/' + ne + '/general.json'); if (!(g.cab && g.cab.length)) return go('index.html');
+      } else if (pg === 'provincia.html') {
+        const g = await jget('datos/' + ne + '/general.json'); if (P.get('v') && P.get('v') !== 'mun' && !g.hasdip) P.delete('v'); P.delete('pj');
+      }
+    } catch (err) { return go('index.html') }
+    const t = P.toString(); nav(pg + (t ? '?' + t : ''));
+  };
   $('#provSel').innerHTML = (curProv ? '' : '<option value="">Elige…</option>') + provOpts(curProv || '');
   $('#provSel').onchange = e => { if (e.target.value) nav(hProv(e.target.value)) };
   let MUNS = null; const inp = $('#munq'), dl = $('#munlist');
@@ -341,3 +357,44 @@ function dhcCard(name, E, bl, seats, extra) {
   <p class="note" style="margin:10px 0 0">${nf(valid)} votos válidos${extra || ''}.</p>`;
 }
 const NODH = 'En este municipio el reparto no se puede reconstruir con D\'Hondt a partir de las candidaturas agrupadas: es habitual en los municipios de 250 habitantes o menos (lista abierta o concejo abierto) o cuando varias listas de una misma familia se agrupan aquí.';
+
+
+/* ---- zoom con la rueda, arrastre para desplazar y botón de restaurar vista (mapas SVG) ---- */
+(function () {
+  const parse = svg => (svg.getAttribute('viewBox') || '0 0 100 100').split(/[\s,]+/).map(Number);
+  function st(svg) {
+    if (svg.__z) return svg.__z;
+    const z = svg.__z = { base: parse(svg), own: false, btn: null };
+    z.set = v => { z.last = v.map(x => +x.toFixed(3)).join(' '); svg.setAttribute('viewBox', z.last); z.btn.hidden = v.every((x, k) => Math.abs(x - z.base[k]) < 1e-6) };
+    new MutationObserver(() => { if (svg.getAttribute('viewBox') === z.last) return; z.base = parse(svg); z.btn.hidden = true }).observe(svg, { attributes: true, attributeFilter: ['viewBox'] });
+    const host = svg.parentNode; if (getComputedStyle(host).position === 'static') host.style.position = 'relative';
+    const b = z.btn = document.createElement('button'); b.type = 'button'; b.className = 'zbtn'; b.hidden = true; b.textContent = '⟲ Restaurar vista'; b.title = 'Volver a la vista inicial del mapa';
+    b.onclick = () => z.set(z.base.slice()); host.appendChild(b);
+    return z;
+  }
+  const mapOf = t => t && t.closest ? t.closest('svg.natmap,svg.pmap') : null;
+  document.addEventListener('wheel', e => {
+    const svg = mapOf(e.target); if (!svg || !svg.getScreenCTM) return;
+    e.preventDefault(); const z = st(svg), cur = parse(svg), b = z.base;
+    const f = Math.pow(1.0018, e.deltaY); let w = cur[2] * f, h = cur[3] * f;
+    if (w >= b[2] || h >= b[3]) { z.set(b.slice()); return }
+    if (w < b[2] / 60) return;
+    const pt = svg.createSVGPoint(); pt.x = e.clientX; pt.y = e.clientY; const p = pt.matrixTransform(svg.getScreenCTM().inverse());
+    let x = p.x - (p.x - cur[0]) * f, y = p.y - (p.y - cur[1]) * f;
+    z.set([x, y, w, h]);
+  }, { passive: false });
+  let drag = null, moved = false;
+  document.addEventListener('mousedown', e => {
+    if (e.button !== 0) return; const svg = mapOf(e.target); if (!svg) return; const z = st(svg);
+    drag = { svg, z, x: e.clientX, y: e.clientY, v: parse(svg) }; moved = false;
+  });
+  window.addEventListener('mousemove', e => {
+    if (!drag) return; const dx = e.clientX - drag.x, dy = e.clientY - drag.y;
+    if (!moved && Math.hypot(dx, dy) < 5) return;
+    const v = drag.v, b = drag.z.base; if (v[2] >= b[2] - 1e-6) return;
+    moved = true; const r = drag.svg.getBoundingClientRect(), k = Math.max(v[2] / r.width, v[3] / r.height);
+    drag.z.set([v[0] - dx * k, v[1] - dy * k, v[2], v[3]]); drag.svg.classList.add('panning');
+  });
+  window.addEventListener('mouseup', () => { if (drag) drag.svg.classList.remove('panning'); drag = null });
+  document.addEventListener('click', e => { if (moved) { e.stopPropagation(); e.preventDefault(); moved = false } }, true);
+})();

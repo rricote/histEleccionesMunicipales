@@ -37,14 +37,14 @@
 const IID = (() => { let i = Q.get('i') || '38-4'; return /^3[58]-\d$/.test(i) ? i : '38-4' })();
 const PID = IID.slice(0, 2);
 let P, PD, C, MUNJ, M = [], SORT = { k: 'censo', d: -1 }, PBS;
-const THR = 0.05;
+const CTHR = 0.05;
 function head() {
   const prov = G.prov[G.pi[PID]];
   crumbs([{ t: 'General', h: href('index.html') }, { l: 'Provincia', t: prov.n, h: hProv(PID) }, { l: 'Cabildo', t: 'Cabildo de ' + ISLN[IID] }]);
   $('#sw').innerHTML = Object.keys(ISLN).map(i => `<a href="${hCab(i)}" class="${i === IID ? 'on' : ''}">${ISLN[i]}</a>`).join('') + `<a href="${hProv(PID)}">← Provincia de ${esc(prov.n)}</a>`;
 }
 function main() {
-  const E = ents(C[6], C[7]), seats = C[2], A = analyzeE(E, C[4], seats, THR), valid = A.valid, g = govOf('c' + IID), SL = seatList(E);
+  const E = ents(C[6], C[7]), seats = C[2], A = analyzeE(E, C[4], seats, CTHR), valid = A.valid, g = govOf('c' + IID), SL = seatList(E);
   const vt = valid + C[5], w = win(E, C[4], 'v');
   $('#pd').innerHTML = `<h3>Cabildo de ${esc(ISLN[IID])}</h3><div class="meta">${seats} consejeros insulares · ${M.length} municipios · ${esc(G.date)}</div>
   <div class="kpis k4"><div><b>${fmt(vt / C[3])}</b><span>participación (${nf(vt)} votantes de ${nf(C[3])} electores)</span></div>
@@ -59,7 +59,7 @@ function main() {
   $('#dhc').innerHTML = `<h2>Cómo se reparten los consejeros</h2><p class="note">Método D'Hondt: cada candidatura por encima del 5 % de los votos válidos divide su voto entre 1, 2, 3…; los ${seats} cocientes más altos se llevan un consejero. Las barras sólidas ganan escaño; las punteadas son las primeras que se quedan fuera.${seats > 12 ? ' Aquí se muestran solo los últimos diez consejeros repartidos y los que se quedan a las puertas.' : ''}</p>
   <div class="qs">${qshow.map(q => `<div class="qr ${q.won ? 'won' : 'out'}"><span class="qn">${q.n}</span><span class="qp">${wnE(A.L[q.k])} <small>÷${q.d}</small></span><span class="qb"><i style="width:${q.q / qmax * 100}%;background:${pcol(A.L[q.k].i)}"></i></span><span class="qv">${fmt(q.q)}<small>${nf(Math.round(q.q * valid))}</small></span></div>`).join('')}</div>`;
   const MAXG = 4, fm = x => x.toFixed(2).replace('.', ','), xx = x => (1 - Math.min(x, MAXG) / MAXG) * 100;
-  const h = A.lastW.k, gaps = []; A.L.forEach((e, j) => { if (j === h) return; const nd = needShare(A.row, j, seats, A.es[j] + 1, THR); if (nd !== null) gaps.push([j, (nd - A.row[j]) * 100, (nd - A.row[j]) * valid]) }); gaps.sort((a, b) => a[1] - b[1]);
+  const h = A.lastW.k, gaps = []; A.L.forEach((e, j) => { if (j === h) return; const nd = needShare(A.row, j, seats, A.es[j] + 1, CTHR); if (nd !== null) gaps.push([j, (nd - A.row[j]) * 100, (nd - A.row[j]) * valid]) }); gaps.sort((a, b) => a[1] - b[1]);
   const near = gaps.filter(x => x[1] <= MAXG).slice(0, 4), ln = j => A.L[j];
   $('#lsn').textContent = `${en(ln(h))} se llevó el último de los ${seats} consejeros. Cada cuadrado es un rival y su posición marca cuántos puntos de voto le habrían faltado para quitárselo (con el resto reducidos en proporción). Se muestran los que estaban a menos de ${MAXG} puntos.`;
   const ticks = [4, 3, 2, 1, 0].map(v => `<span class="${v % 2 ? 'o' : ''}" style="left:${(1 - v / MAXG) * 100}%">${v === 0 ? 'empate' : 'a ' + v + ' pts'}</span>`).join('');
